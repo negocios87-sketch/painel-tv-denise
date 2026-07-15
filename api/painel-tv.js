@@ -38,6 +38,12 @@ const URL_FERIADOS = process.env.URL_FERIADOS ||
 const DENISE_SQUADS = { sniper: "Sniper", elite: "Elite", olympus: "Olympus", mgm: "Olympus" };
 const MARCO_ATINGIMENTO = 40.0; // checkpoint fixo — ajuste se for dinâmico
 
+// Painel de Metas (2ª página) — cortes fixos confirmados com o Rodrigo:
+// sempre dia 16 (checkpoint de 40%) e último dia do mês (checkpoint de 100%).
+const CORTE_40_DIA = 16;
+// Excluída da tabela de reuniões (SDR) — igual ao Matheus Paz no dashboard original.
+const EXCLUIR_SDR_METAS = new Set(["leticia"]); // compara pelo primeiro nome normalizado
+
 // ── HELPERS ──────────────────────────────────────────────────
 function norm(s) {
   if (!s) return "";
@@ -165,6 +171,19 @@ function duRestantes(ano, mes, feriadosSet) {
   for (let d = hoje.getUTCDate() + 1; d <= total; d++) {
     const dt = new Date(Date.UTC(ano, mes - 1, d));
     if (isWeekday(dt) && !feriadosSet.has(ymd(dt))) count++;
+  }
+  return count;
+}
+// Dias úteis entre AMANHÃ (BRT) e uma data-alvo específica, inclusive.
+// Usado pros cortes de checkpoint (dia 16 e último dia do mês).
+function duAteData(anoAlvo, mesAlvo, diaAlvo, feriadosSet) {
+  const hojeStr = hojeBRTStr();
+  const hojeDt = new Date(hojeStr + "T00:00:00Z");
+  const alvoDt = new Date(Date.UTC(anoAlvo, mesAlvo - 1, diaAlvo));
+  if (alvoDt <= hojeDt) return 0; // corte já passou
+  let count = 0;
+  for (let d = new Date(hojeDt.getTime() + 86400000); d <= alvoDt; d = new Date(d.getTime() + 86400000)) {
+    if (isWeekday(d) && !feriadosSet.has(ymd(d))) count++;
   }
   return count;
 }
@@ -378,13 +397,31 @@ export default async function handler(req, res) {
     const subCol = colCols.find(c => norm(c) === "subarea");
     const nomeCol = colCols.find(c => norm(c) === "nome") || "Nome";
     const headCol = colCols.find(c => norm(c).includes("head"));
+    const liderCol = colCols.find(c => norm(c).includes("lider") && norm(c).includes("team"));
 
-    const nomeToSub = {}, nomeToHead = {};
+    const nomeToSub = {}, nomeToHead = {}, nomeToHeadRaw = {}, nomeToLider = {};
     colabRows.forEach(r => {
       const nn = norm(r[nomeCol]);
       nomeToSub[nn] = subCol ? (r[subCol] || "").trim() : "";
       nomeToHead[nn] = headCol ? norm(r[headCol]) : "";
+      nomeToHeadRaw[nn] = headCol ? (r[headCol] || "").trim() : "";
+      nomeToLider[nn] = liderCol ? (r[liderCol] || "").trim() : "";
     });
+
+    function squadHeadName(displaySquad) {
+      const rawKeys = Object.keys(DENISE_SQUADS).filter(k => DENISE_SQUADS[k] === displaySquad);
+      const counts = {};
+      colabRows.forEach(r => {
+        const sub = norm((r[subCol] || "").trim());
+        if (!rawKeys.includes(sub)) return;
+        const h = nomeToHeadRaw[norm(r[nomeCol])];
+        if (!h) return;
+        counts[h] = (counts[h] || 0) + 1;
+      });
+      let best = null, bestC = 0;
+      Object.entries(counts).forEach(([k, c]) => { if (c > bestC) { best = k; bestC = c; } });
+      return best;
+    }
 
     const uidToNorm = {}, nomeNormToUid = {};
     Object.entries(usersPipe).forEach(([uid, name]) => {
@@ -510,7 +547,7 @@ export default async function handler(req, res) {
       const pctFinal = arred(pctReu * PESO_REU + pctGanhos * PESO_FIN);
       squadsOut[display].sdrs.push({
         nome: m.nome,
-        lider: "", // não crítico pro painel — adicionar se precisar mapear team leader
+        lider: nomeToLider[m.nome_norm] || "",
         meta_diaria: ceilSafeDiv(m.meta_reu, duTotal),
         meta_reuniao: arred(m.meta_reu),
         validadas,
@@ -633,6 +670,120 @@ export default async function handler(req, res) {
     todosSdrs.sort((a, b) => b.pct - a.pct);
     const topSdrs = todosSdrs.slice(0, 3);
 
+    // ══════════════════════════════════════════════════════════
+    // PAINEL DE METAS (2ª página) — ritmo necessário pra bater os
+    // cortes de 40% (dia 16) e 100% (fim do mês).
+    // ⚠️ Fórmulas deduzidas do print que você mandou, não confirmadas
+    // contra o painel real linha a linha. Confere os primeiros números
+    // que aparecerem antes de confiar.
+    // ══════════════════════════════════════════════════════════
+    const ultimoDiaMes = daysInMonth(ano, mes);
+    const diasAteCorte40 = duAteData(ano, mes, CORTE_40_DIA, feriados);
+    const corte40Vencido = diasAteCorte40 === 0 && hoje.getUTCDate() > CORTE_40_DIA;
+    const diasAteCorte100 = duRest; // corte 100% = último DU do mês, já calculado
+
+    function classificarRitmo(bateu, requerido, normal) {
+      if (bateu) return "verde";
+      if (!normal) return "vermelho";
+      const ratio = requerido / normal;
+      if (ratio <= 1) return "verde";
+      if (ratio <= 1.5) return "laranja";
+      return "vermelho";
+    }
+
+    // ── Closers (Elite + Olympus) ──
+    const metasClosers = [];
+    for (const nome of ["Elite", "Olympus"]) {
+      squadsOut[nome].closers.forEach(c => {
+        if (c.meta <= 0) return; // pula heads e linha virtual da Denise
+        const meta40 = arred(c.meta * 0.4);
+        const gap40 = arred(meta40 - c.realizado_multi);
+        const bateu40 = gap40 <= 0;
+        const req40 = bateu40 ? 0 : (corte40Vencido ? gap40 : arred(safeDiv(gap40, diasAteCorte40)));
+        const gap100 = arred(c.meta - c.realizado_multi);
+        const req100 = gap100 <= 0 ? 0 : arred(safeDiv(gap100, diasAteCorte100));
+        metasClosers.push({
+          nome: c.nome, squad: nome.slice(0, 3).toUpperCase(),
+          realizado_multi: c.realizado_multi, pct: c.pct_atingido_multi,
+          bateu40, vencido40: corte40Vencido && !bateu40,
+          req40, req100,
+          cor: classificarRitmo(bateu40, req40, c.meta_du),
+        });
+      });
+    }
+    metasClosers.sort((a, b) => b.realizado_multi - a.realizado_multi);
+
+    const closersAbaixo = metasClosers.filter(c => c.cor !== "verde");
+    const closersBateram = metasClosers.filter(c => c.bateu40);
+    const closerMaisProximo = closersAbaixo.length
+      ? closersAbaixo.reduce((best, c) => (!best || c.pct > best.pct) ? c : best, null)
+      : null;
+
+    let alertaClosers = null;
+    if (metasClosers.length) {
+      const todosAbaixo = closersAbaixo.length === metasClosers.length;
+      alertaClosers = {
+        titulo: todosAbaixo
+          ? "100% DOS CLOSERS DESENQUADRADOS"
+          : `${closersAbaixo.length} DE ${metasClosers.length} CLOSERS DESENQUADRADOS`,
+        detalhe: [
+          closersBateram.length
+            ? `${closersBateram.length === 1 ? "Apenas " : ""}${closersBateram.map(c => c.nome.split(" ")[0]).join(", ")} atingiu 40% da meta`
+            : "Ninguém bateu 40% da meta ainda",
+          `${closersAbaixo.length} de ${metasClosers.length} closers abaixo do ritmo esperado`,
+          closerMaisProximo ? `${closerMaisProximo.nome.split(" ")[0]} mais próximo (${closerMaisProximo.pct.toFixed(1)}%)` : null,
+          corte40Vencido ? "Corte de 40% já venceu" : `Intervenção obrigatória nos próximos ${diasAteCorte40} dias`,
+        ].filter(Boolean).join(" · "),
+        nivel: todosAbaixo ? "critico" : (closersAbaixo.length > metasClosers.length / 2 ? "alerta" : "ok"),
+      };
+    }
+
+    // ── SDRs (Sniper, excluindo Leticia) ──
+    const metasSdrs = [];
+    squadsOut.Sniper.sdrs.forEach(s => {
+      if (s.meta_reuniao <= 0) return;
+      const primeiroNome = norm(s.nome).split(" ")[0];
+      if (EXCLUIR_SDR_METAS.has(primeiroNome)) return;
+      const meta40 = Math.ceil(s.meta_reuniao * 0.4);
+      const gap40 = meta40 - s.validadas;
+      const bateu40 = gap40 <= 0;
+      const req40 = bateu40 ? 0 : (corte40Vencido ? gap40 : ceilSafeDiv(gap40, diasAteCorte40));
+      const gap100 = s.meta_reuniao - s.validadas;
+      const req100 = gap100 <= 0 ? 0 : ceilSafeDiv(gap100, diasAteCorte100);
+      metasSdrs.push({
+        nome: s.nome, lider: s.lider || "—",
+        validadas: s.validadas,
+        bateu40, vencido40: corte40Vencido && !bateu40,
+        req40, req100,
+        cor: classificarRitmo(bateu40, req40, s.meta_diaria),
+      });
+    });
+    metasSdrs.sort((a, b) => b.validadas - a.validadas);
+
+    // Agrupamento por líder (TL) — soma do ritmo necessário (40%) de cada grupo
+    const gruposLider = {};
+    metasSdrs.forEach(s => {
+      const key = s.lider || "Sem líder";
+      gruposLider[key] = gruposLider[key] || { lider: key, req40: 0, qtd: 0 };
+      gruposLider[key].req40 += s.req40;
+      gruposLider[key].qtd += 1;
+    });
+    const totalReq40Sniper = metasSdrs.reduce((s, r) => s + r.req40, 0);
+    const totalReq100Sniper = metasSdrs.reduce((s, r) => s + r.req100, 0);
+    const totalValidadasSniper = metasSdrs.reduce((s, r) => s + r.validadas, 0);
+    const nomeHeadSniper = squadHeadName("Sniper");
+
+    const payloadMetas = {
+      corte40: { dia: CORTE_40_DIA, mes, ano, dias_uteis_restantes: diasAteCorte40, vencido: corte40Vencido },
+      corte100: { dia: ultimoDiaMes, mes, ano, dias_uteis_restantes: diasAteCorte100 },
+      alerta_closers: alertaClosers,
+      closers: metasClosers,
+      sdrs: metasSdrs,
+      sdr_grupos_lider: Object.values(gruposLider),
+      sdr_head: nomeHeadSniper ? { nome: nomeHeadSniper, req40: totalReq40Sniper } : null,
+      sdr_total: { validadas: totalValidadasSniper, req40: totalReq40Sniper, req100: totalReq100Sniper, qtd: metasSdrs.length },
+    };
+
     const payload = {
       periodo: {
         data: hoje.toLocaleDateString("pt-BR"),
@@ -649,6 +800,7 @@ export default async function handler(req, res) {
       squads: squadsCards,
       top_closers: topClosers,
       top_sdrs: topSdrs,
+      metas: payloadMetas,
       atualizado_em: new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
     };
 
