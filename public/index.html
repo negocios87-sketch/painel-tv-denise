@@ -13,17 +13,17 @@
     --panel-2: #1B1B1E;
     --line: #2C2C2F;
     --line-soft: #1F1F22;
-    --gold: #C9A24B;
-    --gold-bright: #E8C878;
+    --gold: #D4A947;
+    --gold-bright: #F4C860;
     --white: #F1F1EE;
     --dim: #85858A;
     --mid: #B4B4B6;
-    --neg: #B15B4A;
+    --neg: #C85F45;
 
-    /* toques de cor por squad — dessaturados de propósito, não neon */
-    --sniper: #6E8BAE;
-    --elite: #B15B4A;
-    --olympus: #5C9578;
+    /* toques de cor por squad — visíveis, mas ainda longe de neon */
+    --sniper: #4E85C4;
+    --elite: #C85A3E;
+    --olympus: #3FAE7A;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{
@@ -68,13 +68,13 @@
     content:""; position:absolute; top:0; left:0; width:100%; height:2px;
     background:var(--line-soft);
   }
-  .card.on::before{ background:var(--gold); box-shadow:0 0 10px rgba(201,162,75,0.6); }
-  .card.off::before{ background:var(--neg); box-shadow:0 0 10px rgba(177,91,74,0.5); }
+  .card.on::before{ background:var(--gold); box-shadow:0 0 12px rgba(212,169,71,0.75); }
+  .card.off::before{ background:var(--neg); box-shadow:0 0 12px rgba(200,95,69,0.65); }
   .card .label{ font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; font-weight:600; }
   .card .value{ font-size:32px; font-weight:700; margin-top:6px; color:var(--white); }
   .card .sub{ font-size:12px; color:var(--dim); margin-top:6px; }
-  .pos{ color:var(--gold-bright); text-shadow:0 0 10px rgba(201,162,75,0.35); }
-  .neg{ color:var(--neg); }
+  .pos{ color:var(--gold-bright); text-shadow:0 0 12px rgba(212,169,71,0.5); }
+  .neg{ color:var(--neg); text-shadow:0 0 10px rgba(200,95,69,0.35); }
 
   /* ── Squad cards ────────────────────────── */
   .squad-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); }
@@ -89,7 +89,8 @@
     font-size:13px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase;
     color:var(--accent, var(--gold));
   }
-  .squad-card .sq-pct{ font-size:40px; font-weight:700; margin:4px 0 12px; color:var(--white); }
+  .squad-card .sq-pct{ font-size:40px; font-weight:700; margin:4px 0 0; color:var(--white); }
+  .squad-card .sq-caption{ font-size:11px; color:var(--dim); letter-spacing:0.5px; margin-bottom:10px; }
   .squad-card .row{
     display:flex; justify-content:space-between; font-size:13px;
     padding:6px 0; border-top:1px solid var(--line-soft);
@@ -121,7 +122,7 @@
     position:absolute; top:0; left:0;
     width:44px; height:44px; border-radius:50%; object-fit:cover;
     background:var(--panel-2); display:block;
-    box-shadow:0 0 0 2px var(--accent, var(--gold)), 0 0 14px rgba(201,162,75,0.25);
+    box-shadow:0 0 0 2px var(--accent, var(--gold)), 0 0 16px rgba(212,169,71,0.35);
   }
   .item .avatar-fallback{
     position:absolute; top:0; left:0;
@@ -137,6 +138,7 @@
     letter-spacing:1.5px; margin-top:1px; font-weight:600;
   }
   .item .pct{ font-size:23px; font-weight:700; text-align:right; color:var(--gold-bright); }
+  .item .pct-label{ font-size:10px; color:var(--dim); text-align:right; letter-spacing:0.5px; }
   .item .delta{ font-size:11px; text-align:right; margin-top:2px; }
 
   .loading, .error{
@@ -168,6 +170,7 @@ function fmtMoney(v){
 function fmtPct(v){ return (v === null || v === undefined) ? "—" : `${v.toFixed(1)}%`; }
 function fmtNum(v, d=1){ return (v === null || v === undefined) ? "—" : v.toFixed(d); }
 function fmtInt(v){ return (v === null || v === undefined) ? "—" : String(Math.round(v)); }
+function fmtReu(v){ return (v === null || v === undefined) ? "—" : `${Math.round(v)}/dia`; }
 function cls(v){ return v >= 0 ? "pos" : "neg"; }
 function arrow(v){ return v >= 0 ? "▲" : "▼"; }
 function iniciais(nome){
@@ -210,6 +213,7 @@ function squadCardHTML(sq){
   <div class="squad-card" style="--accent:${accent}">
     <div class="sq-name">${sq.nome}</div>
     <div class="sq-pct">${fmtPct(sq.ating_pct)}</div>
+    <div class="sq-caption">atingimento do mês</div>
     <div class="ritmo-track"><div class="ritmo-fill" style="width:${fillPct}%"></div></div>
     <div class="row"><span>${isReuniao ? "Meta reuniões/dia" : "Meta/dia"}</span><span class="num">${fmtVal(sq.meta_dia)}</span></div>
     <div class="row"><span>${isReuniao ? "Reuniões hoje" : "Vendido hoje"}</span><span class="num">${fmtVal(sq.real_dia)}</span></div>
@@ -230,6 +234,7 @@ function closerItemHTML(c, i){
     </div>
     <div>
       <div class="pct">${fmtPct(c.pct)}</div>
+      <div class="pct-label">no mês</div>
       <div class="delta num ${cls(c.delta_dia)}">${arrow(c.delta_dia)} ${fmtMoney(Math.abs(c.delta_dia))} vs meta hoje</div>
     </div>
   </div>`;
@@ -246,6 +251,7 @@ function sdrItemHTML(s, i){
     </div>
     <div>
       <div class="pct">${fmtPct(s.pct)}</div>
+      <div class="pct-label">no mês</div>
       <div class="delta num ${cls(s.delta_dia)}">${arrow(s.delta_dia)} ${fmtNum(Math.abs(s.delta_dia))} vs meta hoje</div>
     </div>
   </div>`;
@@ -287,8 +293,8 @@ function render(d){
       </div>
       <div class="card">
         <div class="label">Meta reuniões/dia</div>
-        <div class="value num">${fmtNum(d.meta_reunioes_dia,1)}/dia</div>
-        <div class="sub">time Denise, SDRs</div>
+        <div class="value num">${fmtReu(d.meta_reunioes_dia)}</div>
+        <div class="sub">time Denise, SDRs · arredondado p/ cima</div>
       </div>
       <div class="card">
         <div class="label">Reuniões hoje</div>
