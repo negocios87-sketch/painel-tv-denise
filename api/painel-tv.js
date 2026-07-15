@@ -42,7 +42,12 @@ const MARCO_ATINGIMENTO = 40.0; // checkpoint fixo — ajuste se for dinâmico
 // sempre dia 16 (checkpoint de 40%) e último dia do mês (checkpoint de 100%).
 const CORTE_40_DIA = 16;
 // Excluída da tabela de reuniões (SDR) — igual ao Matheus Paz no dashboard original.
-const EXCLUIR_SDR_METAS = new Set(["leticia"]); // compara pelo primeiro nome normalizado
+const EXCLUIR_SDR_METAS = new Set(["leticia"]); // compara pelo primeiro nome normalizado — só afeta a tabela da 2ª página, igual no painel original ("sem Leticia")
+// Pessoas que aparecem com meta de SDR na planilha mas NÃO são do Sniper de
+// verdade (erro de classificação na base) — excluídas de TUDO: squad card,
+// Top3, e tabela de metas. Diferente da EXCLUIR_SDR_METAS acima, que só tira
+// da tabela específica mas mantém a pessoa nos totais.
+const EXCLUIR_SNIPER_TOTAL = new Set(["priscila"]);
 
 // ── HELPERS ──────────────────────────────────────────────────
 function norm(s) {
@@ -535,6 +540,7 @@ export default async function handler(req, res) {
       const sub = nomeToSub[m.nome_norm] || "";
       const display = DENISE_SQUADS[norm(sub)];
       if (!display) return;
+      if (display === "Sniper" && EXCLUIR_SNIPER_TOTAL.has(m.nome_norm.split(" ")[0])) return;
       const uid = nomeNormToUid[m.nome_norm];
       const acts = uid ? (actsByOwner[String(uid)] || []) : [];
       const validadas = acts.filter(actValida).length;
