@@ -70,6 +70,13 @@ function getOwnerId(deal) {
   if (uid && typeof uid === "object") return uid.id;
   return uid;
 }
+function hojeBRTStr() {
+  // Aproximação BRT = UTC-3 (Brasil não observa horário de verão atualmente)
+  const now = new Date();
+  const brt = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+  return brt.toISOString().slice(0, 10);
+}
+
 function wonTimeBR(deal) {
   const wt = deal.won_time;
   if (!wt) return "";
@@ -388,27 +395,38 @@ export default async function handler(req, res) {
     }
 
     // Realizado por owner (com multiplicador) + distribuição da Denise por funil
-    const closerReal = {}; // nn -> {valor, valorMulti, qtd}
-    const denisePorSquad = {}; // "Sniper"/"Elite"/"Olympus" -> {valor, valorMulti, qtd}
-    deals.forEach(deal => {
-      let ownerNn = norm(getOwnerName(deal));
-      if (!ownerNn) ownerNn = uidToNorm[getOwnerId(deal)] || "";
-      if (!ownerNn) return;
-      const valor = parseFloat(deal.value) || 0;
-      const valorMulti = parseFloat(cf(deal, CF_MULTIPLICADOR)) || 0;
-      const squadFunil = squadPorFunil(deal);
-      if (squadFunil) {
-        denisePorSquad[squadFunil] = denisePorSquad[squadFunil] || { valor: 0, valorMulti: 0, qtd: 0 };
-        denisePorSquad[squadFunil].valor += valor;
-        denisePorSquad[squadFunil].valorMulti += valorMulti;
-        denisePorSquad[squadFunil].qtd += 1;
-      } else {
-        closerReal[ownerNn] = closerReal[ownerNn] || { valor: 0, valorMulti: 0, qtd: 0 };
-        closerReal[ownerNn].valor += valor;
-        closerReal[ownerNn].valorMulti += valorMulti;
-        closerReal[ownerNn].qtd += 1;
-      }
-    });
+    // Duas agregações: MÊS INTEIRO (pra ranking/% atingimento mensal) e HOJE
+    // (pra "quanto vendeu hoje", literal, calendário — confirmado com o Rodrigo)
+    const hojeStr = hojeBRTStr();
+    const dealsHoje = deals.filter(d => wonTimeBR(d).slice(0, 10) === hojeStr);
+
+    function agregarDeals(listaDeals) {
+      const closerReal = {};
+      const denisePorSquad = {};
+      listaDeals.forEach(deal => {
+        let ownerNn = norm(getOwnerName(deal));
+        if (!ownerNn) ownerNn = uidToNorm[getOwnerId(deal)] || "";
+        if (!ownerNn) return;
+        const valor = parseFloat(deal.value) || 0;
+        const valorMulti = parseFloat(cf(deal, CF_MULTIPLICADOR)) || 0;
+        const squadFunil = squadPorFunil(deal);
+        if (squadFunil) {
+          denisePorSquad[squadFunil] = denisePorSquad[squadFunil] || { valor: 0, valorMulti: 0, qtd: 0 };
+          denisePorSquad[squadFunil].valor += valor;
+          denisePorSquad[squadFunil].valorMulti += valorMulti;
+          denisePorSquad[squadFunil].qtd += 1;
+        } else {
+          closerReal[ownerNn] = closerReal[ownerNn] || { valor: 0, valorMulti: 0, qtd: 0 };
+          closerReal[ownerNn].valor += valor;
+          closerReal[ownerNn].valorMulti += valorMulti;
+          closerReal[ownerNn].qtd += 1;
+        }
+      });
+      return { closerReal, denisePorSquad };
+    }
+
+    const { closerReal, denisePorSquad } = agregarDeals(deals);
+    const { closerReal: closerRealHoje, denisePorSquad: denisePorSquadHoje } = agregarDeals(dealsHoje);
 
     // Validação de reunião (mesma regra do act_valida do Python)
     function actValida(act) {
@@ -441,9 +459,9 @@ export default async function handler(req, res) {
       const display = DENISE_SQUADS[norm(sub)];
       if (!display) return;
       const ri = closerReal[m.nome_norm] || { valor: 0, valorMulti: 0, qtd: 0 };
-      squadsOut[display].closers.push(
-        buildCloserRow(m.nome, m.meta_fin, ri.valor, ri.valorMulti, ri.qtd, duTotal, duPass, duRest)
-      );
+      const row = buildCloserRow(m.nome, m.meta_fin, ri.valor, ri.valorMulti, ri.qtd, duTotal, duPass, duRest);
+      row.real_hoje = arred((closerRealHoje[m.nome_norm] || { valorMulti: 0 }).valorMulti);
+      squadsOut[display].closers.push(row);
     });
 
     // Heads que vendem mas não têm meta de closer explícita (meta=0, só soma no total)
@@ -458,17 +476,17 @@ export default async function handler(req, res) {
       const already = squadsOut[display].closers.some(c => norm(c.nome) === nn);
       if (already) return;
       const ri = closerReal[nn];
-      squadsOut[display].closers.push(
-        buildCloserRow(uname, 0, ri.valor, ri.valorMulti, ri.qtd, duTotal, duPass, duRest)
-      );
+      const row = buildCloserRow(uname, 0, ri.valor, ri.valorMulti, ri.qtd, duTotal, duPass, duRest);
+      row.real_hoje = arred((closerRealHoje[nn] || { valorMulti: 0 }).valorMulti);
+      squadsOut[display].closers.push(row);
     });
 
     // Injeta vendas da Denise (distribuídas por funil) como linha virtual, meta=0
     Object.entries(denisePorSquad).forEach(([display, di]) => {
       if (!squadsOut[display]) return;
-      squadsOut[display].closers.push(
-        buildCloserRow("Denise Mussolin*", 0, di.valor, di.valorMulti, di.qtd, duTotal, duPass, duRest)
-      );
+      const row = buildCloserRow("Denise Mussolin*", 0, di.valor, di.valorMulti, di.qtd, duTotal, duPass, duRest);
+      row.real_hoje = arred((denisePorSquadHoje[display] || { valorMulti: 0 }).valorMulti);
+      squadsOut[display].closers.push(row);
     });
 
     sdrsMetas.forEach(m => {
@@ -478,6 +496,7 @@ export default async function handler(req, res) {
       const uid = nomeNormToUid[m.nome_norm];
       const acts = uid ? (actsByOwner[String(uid)] || []) : [];
       const validadas = acts.filter(actValida).length;
+      const validadasHoje = acts.filter(a => String(a.due_date || "").slice(0, 10) === hojeStr && actValida(a)).length;
       const qualId = qualIds[m.nome_norm];
       const dealsSdr = qualId ? deals.filter(d => String(cf(d, CF_QUALIFICADOR)) === String(qualId)) : [];
       const valorMulti = dealsSdr.reduce((s, d) => s + (parseFloat(cf(d, CF_MULTIPLICADOR)) || 0), 0);
@@ -490,6 +509,7 @@ export default async function handler(req, res) {
         meta_diaria: arred(safeDiv(m.meta_reu, duTotal)),
         meta_reuniao: arred(m.meta_reu),
         validadas,
+        validadas_hoje: validadasHoje,
         pct_final: pctFinal,
       });
     });
@@ -501,59 +521,69 @@ export default async function handler(req, res) {
       const tReal = ind.reduce((s, c) => s + c.realizado, 0);
       const tMulti = ind.reduce((s, c) => s + c.realizado_multi, 0);
       const tQtd = ind.reduce((s, c) => s + c.qtd_ganhos, 0);
-      return buildCloserRow("TOTAL", tMeta, tReal, tMulti, tQtd, duTotal, duPass, duRest);
+      const tHoje = ind.reduce((s, c) => s + (c.real_hoje || 0), 0);
+      const row = buildCloserRow("TOTAL", tMeta, tReal, tMulti, tQtd, duTotal, duPass, duRest);
+      row.real_hoje = arred(tHoje);
+      return row;
     }
     function totalSdr(ind) {
       if (!ind.length) return null;
       const tReu = ind.reduce((s, c) => s + c.meta_reuniao, 0);
       const tVal = ind.reduce((s, c) => s + c.validadas, 0);
+      const tValHoje = ind.reduce((s, c) => s + (c.validadas_hoje || 0), 0);
       return {
         meta_diaria: arred(safeDiv(tReu, duTotal)),
         validadas: tVal,
+        validadas_hoje: tValHoje,
       };
     }
 
     const squadsCards = [];
-    let totalRealizadoMulti = 0, totalMetaDu = 0, totalMetaDiaMulti = 0;
-    let totalReuMetaDiaria = 0, totalReuValidadas = 0;
+    let totalRealizadoHoje = 0, totalMetaDu = 0, totalMetaDiaMulti = 0;
+    let totalReuMetaDiaria = 0, totalReuValidadasHoje = 0;
 
     for (const nome of ["Sniper", "Elite", "Olympus"]) {
       const sq = squadsOut[nome];
       const tc = totalCloser(sq.closers);
       const ts = totalSdr(sq.sdrs);
       if (tc) {
-        totalRealizadoMulti += tc.realizado_multi;
+        totalRealizadoHoje += tc.real_hoje;
         totalMetaDu += tc.meta_du;
         totalMetaDiaMulti += tc.meta_dia_multi;
       }
       if (ts) {
         totalReuMetaDiaria += ts.meta_diaria;
-        totalReuValidadas += ts.validadas;
+        totalReuValidadasHoje += ts.validadas_hoje;
       }
-      const ritmoSq = tc ? arred(safeDiv(tc.realizado_multi, duPass)) : 0;
+      const realHojeSq = tc ? tc.real_hoje : 0;
       squadsCards.push({
         nome,
         ating_pct: tc ? tc.pct_atingido_multi : 0,
         meta_dia: tc ? tc.meta_du : 0,
-        real_dia: ritmoSq,
-        gap_dia: tc ? arred(ritmoSq - tc.meta_du) : 0,
+        real_dia: realHojeSq,
+        // Gap = realizado hoje - meta do dia. Negativo = abaixo da meta (confirmado com o Rodrigo).
+        gap_dia: tc ? arred(realHojeSq - tc.meta_du) : 0,
         marco_pct: tc ? arred(safeDiv(tc.pct_atingido_multi, MARCO_ATINGIMENTO) * 100) : 0,
       });
     }
 
-    const ritmoAtualClosers = arred(safeDiv(totalRealizadoMulti, duPass));
-    const ritmoReunioes = arred(safeDiv(totalReuValidadas, duPass));
+    const realizadoHojeClosers = arred(totalRealizadoHoje);
+    const reunioesHoje = totalReuValidadasHoje;
 
     // ── Top 3 closers (exclui meta=0, ou seja heads e linha virtual da Denise) ──
+    // Ranking continua sendo o % de atingimento MENSAL (não faz sentido rankear
+    // "quem vendeu mais hoje" — um closer pode estar mal no mês e ter tido um
+    // dia bom por sorte). O que muda pra "hoje literal" é só o valor mostrado
+    // no badge e o delta.
     let todosClosers = [];
     for (const nome of ["Sniper", "Elite", "Olympus"]) {
       squadsOut[nome].closers.forEach(c => {
         if (c.meta <= 0) return;
-        const ritmo = arred(safeDiv(c.realizado_multi, duPass));
+        const hoje = c.real_hoje || 0;
         todosClosers.push({
           nome: c.nome, squad: nome, pct: c.pct_atingido_multi,
-          meta_dia: c.meta_du, ritmo_dia: ritmo,
-          delta_dia: arred(ritmo - c.meta_du),
+          meta_dia: c.meta_du, ritmo_dia: hoje,
+          delta_dia: arred(hoje - c.meta_du),
         });
       });
     }
@@ -564,11 +594,11 @@ export default async function handler(req, res) {
     for (const nome of ["Sniper", "Elite", "Olympus"]) {
       squadsOut[nome].sdrs.forEach(s => {
         if (s.meta_reuniao <= 0) return;
-        const ritmoReu = arred(safeDiv(s.validadas, duPass));
+        const hojeReu = s.validadas_hoje || 0;
         todosSdrs.push({
           nome: s.nome, lider: s.lider, pct: s.pct_final,
-          meta_dia: s.meta_diaria, ritmo_dia: ritmoReu,
-          delta_dia: arred(ritmoReu - s.meta_diaria),
+          meta_dia: s.meta_diaria, ritmo_dia: hojeReu,
+          delta_dia: arred(hojeReu - s.meta_diaria),
         });
       });
     }
@@ -581,11 +611,13 @@ export default async function handler(req, res) {
         du_dec: duPass, du_rest: duRest, du_total: duTotal,
       },
       meta_diaria_closers: arred(totalMetaDu),
-      ritmo_atual_closers: ritmoAtualClosers,
-      gap_diario_simples: arred(ritmoAtualClosers - totalMetaDu),
+      realizado_hoje_closers: realizadoHojeClosers,
+      // Gap = realizado hoje - meta do dia. Negativo = abaixo da meta.
+      gap_diario_simples: arred(realizadoHojeClosers - totalMetaDu),
       ritmo_necessario_100: arred(totalMetaDiaMulti),
       meta_reunioes_dia: arred(totalReuMetaDiaria),
-      ritmo_reunioes: ritmoReunioes,
+      reunioes_hoje: reunioesHoje,
+      gap_reunioes: arred(reunioesHoje - totalReuMetaDiaria),
       squads: squadsCards,
       top_closers: topClosers,
       top_sdrs: topSdrs,
