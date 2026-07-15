@@ -145,6 +145,61 @@
     display:flex; align-items:center; justify-content:center;
     height:100vh; color:var(--dim); font-size:18px; letter-spacing:0.5px;
   }
+
+  /* ── Painel de Metas (página 2) ─────────── */
+  .alert-banner{
+    display:flex; align-items:center; gap:18px; padding:12px 20px;
+    background:var(--panel); border-left:4px solid var(--neg);
+  }
+  .alert-banner.cor-laranja{ border-left-color:#C4923C; }
+  .alert-banner.cor-verde{ border-left-color:var(--gold); }
+  .alert-title{ font-size:15px; font-weight:800; letter-spacing:1px; color:var(--white); white-space:nowrap; }
+  .alert-detail{ font-size:13px; color:var(--mid); }
+
+  .metas-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; flex:1; min-height:0; }
+  .metas-col h2{
+    font-size:12px; letter-spacing:2.5px; color:var(--dim); text-transform:uppercase;
+    margin-bottom:8px; font-weight:600; border-bottom:1px solid var(--line); padding-bottom:8px;
+  }
+  .metas-table{ width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); }
+  .metas-table thead th{
+    text-align:left; font-size:10px; color:var(--dim); text-transform:uppercase;
+    letter-spacing:1px; font-weight:600; padding:6px 10px; border-bottom:1px solid var(--line);
+  }
+  .metas-table tbody tr{ border-bottom:1px solid var(--line-soft); }
+  .metas-table tbody tr:last-child{ border-bottom:none; }
+  .metas-table td{ padding:6px 10px; font-size:13px; vertical-align:middle; }
+  .metas-table td.num{ font-family:'JetBrains Mono', monospace; text-align:right; }
+  .metas-table td.dim-cell{ color:var(--dim); font-size:12px; }
+  .cell-nome{ min-width:0; }
+  .row-person{ display:flex; align-items:center; gap:8px; }
+  .row-person .avatar-wrap{ width:26px; height:26px; }
+  .row-person .avatar, .row-person .avatar-fallback{ width:26px; height:26px; box-shadow:0 0 0 1px var(--accent, var(--gold)); font-size:9px; }
+  .row-person span{ font-weight:600; color:var(--white); }
+
+  .chip{
+    display:inline-block; font-size:10px; font-weight:700; letter-spacing:0.5px;
+    padding:2px 7px; border:1px solid var(--accent, var(--gold)); color:var(--accent, var(--gold));
+  }
+
+  .badge{
+    display:inline-block; font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700;
+    padding:3px 9px; border-radius:3px;
+  }
+  .badge.cor-verde{ background:rgba(212,169,71,0.15); color:var(--gold-bright); border:1px solid rgba(212,169,71,0.4); }
+  .badge.cor-laranja{ background:rgba(196,146,60,0.15); color:#D9A85C; border:1px solid rgba(196,146,60,0.4); }
+  .badge.cor-vermelho{ background:rgba(200,95,69,0.15); color:#E07A5F; border:1px solid rgba(200,95,69,0.4); }
+  .venc{ font-size:9px; color:var(--neg); text-transform:uppercase; margin-left:6px; letter-spacing:0.5px; }
+
+  .metas-footer{
+    font-size:12px; color:var(--dim); padding:8px 10px; border:1px solid var(--line);
+    border-top:none; background:var(--panel-2);
+  }
+  .metas-total{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:13px; font-weight:700; color:var(--white); padding:8px 10px;
+    border:1px solid var(--gold); border-top:none; background:var(--panel-2);
+  }
 </style>
 </head>
 <body>
@@ -257,7 +312,7 @@ function sdrItemHTML(s, i){
   </div>`;
 }
 
-function render(d){
+function renderRitmo(d){
   const app = document.getElementById("app");
   app.innerHTML = `
     <div class="header">
@@ -325,13 +380,137 @@ function render(d){
   `;
 }
 
+// ══════════════════════════════════════════════════════════
+// PÁGINA 2 — Painel de Metas (checkpoints 40% dia 16 / 100% fim do mês)
+// ══════════════════════════════════════════════════════════
+const COR_MAP = { verde: "cor-verde", laranja: "cor-laranja", vermelho: "cor-vermelho" };
+
+function badge40HTML(row, isReuniao){
+  if (row.bateu40){
+    return `<span class="badge cor-verde">✓ BATEU 40%</span>`;
+  }
+  const val = isReuniao ? `${row.req40}/dia` : fmtMoney(row.req40) + "/dia";
+  const venc = row.vencido40 ? '<span class="venc">vencido</span>' : "";
+  return `<span class="badge ${COR_MAP[row.cor]}">${val}</span>${venc}`;
+}
+
+function closerMetaRowHTML(c, i){
+  const accent = SQUAD_ACCENT[{OLY:"Olympus",ELI:"Elite"}[c.squad]] || "var(--gold)";
+  return `
+  <tr>
+    <td class="cell-nome">
+      <div class="row-person">
+        ${avatarHTML(c.nome, accent)}
+        <span>${c.nome}</span>
+      </div>
+    </td>
+    <td><span class="chip" style="--accent:${accent}">${c.squad}</span></td>
+    <td class="num">${fmtMoney(c.realizado_multi)}</td>
+    <td>${badge40HTML(c, false)}</td>
+    <td class="num dim-cell">${fmtMoney(c.req100)}/dia</td>
+  </tr>`;
+}
+
+function sdrMetaRowHTML(s, i){
+  return `
+  <tr>
+    <td class="cell-nome">
+      <div class="row-person">
+        ${avatarHTML(s.nome, "var(--sniper)")}
+        <span>${s.nome}</span>
+      </div>
+    </td>
+    <td class="dim-cell">${s.lider}</td>
+    <td class="num">${s.validadas}</td>
+    <td>${badge40HTML(s, true)}</td>
+    <td class="num dim-cell">${s.req100}/dia</td>
+  </tr>`;
+}
+
+function renderMetas(d){
+  const app = document.getElementById("app");
+  const m = d.metas;
+  if (!m){
+    app.innerHTML = `<div class="error">Painel de Metas indisponível nesta atualização.</div>`;
+    return;
+  }
+  const alerta = m.alerta_closers;
+  const nivelClass = alerta ? (alerta.nivel === "critico" ? "cor-vermelho" : alerta.nivel === "alerta" ? "cor-laranja" : "cor-verde") : "";
+
+  const gruposHTML = m.sdr_grupos_lider
+    .filter(g => g.lider !== "Sem líder")
+    .map(g => `TL ${g.lider}: ${g.req40}/dia`).join(" · ");
+  const headHTML = m.sdr_head ? `Head ${m.sdr_head.nome}: ${m.sdr_head.req40}/dia` : "";
+
+  app.innerHTML = `
+    <div class="header">
+      <div class="brand">
+        <img class="logo" src="${LOGO_URL}" alt="Board Academy"
+             onerror="this.style.display='none';">
+        <div>
+          <div class="eyebrow">PAINEL DE METAS · C/ MULTIPLICADOR</div>
+          <h1>Meta diária por Closer e SDR</h1>
+        </div>
+      </div>
+      <div class="meta">
+        Corte 40%: dia ${m.corte40.dia}/${String(m.corte40.mes).padStart(2,"0")}
+        ${m.corte40.vencido ? '<span class="venc">(vencido)</span>' : `· ${m.corte40.dias_uteis_restantes} DU restantes`}<br>
+        <b>Corte 100%: dia ${m.corte100.dia}/${String(m.corte100.mes).padStart(2,"0")} · ${m.corte100.dias_uteis_restantes} DU restantes</b>
+      </div>
+    </div>
+
+    ${alerta ? `
+    <div class="alert-banner ${nivelClass}">
+      <div class="alert-title">${alerta.titulo}</div>
+      <div class="alert-detail">${alerta.detalhe}</div>
+    </div>` : ""}
+
+    <div class="metas-grid">
+      <div class="metas-col">
+        <h2>SDRs — Reuniões/dia (Sniper)</h2>
+        <table class="metas-table">
+          <thead><tr><th>SDR</th><th>Líder</th><th>Valid.</th><th>40% (${m.corte40.dias_uteis_restantes}d)</th><th>100% (${m.corte100.dias_uteis_restantes}d)</th></tr></thead>
+          <tbody>${m.sdrs.map(sdrMetaRowHTML).join("")}</tbody>
+        </table>
+        <div class="metas-footer">
+          ${gruposHTML}${gruposHTML && headHTML ? " · " : ""}${headHTML}
+        </div>
+        <div class="metas-total">
+          <span>TOTAL SDR (${m.sdr_total.qtd}) · Valid. ${m.sdr_total.validadas}</span>
+          <span class="num">${m.sdr_total.req40}/dia</span>
+          <span class="num dim-cell">${m.sdr_total.req100}/dia</span>
+        </div>
+      </div>
+
+      <div class="metas-col">
+        <h2>Closers — R$/dia c/ multiplicador</h2>
+        <table class="metas-table">
+          <thead><tr><th>Closer</th><th>Sq</th><th>c/ Multi</th><th>40% (${m.corte40.dias_uteis_restantes}d)</th><th>100% (${m.corte100.dias_uteis_restantes}d)</th></tr></thead>
+          <tbody>${m.closers.map(closerMetaRowHTML).join("")}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+let lastData = null;
+let currentPage = 0;
+const PAGES = [renderRitmo, renderMetas];
+const CAROUSEL_MS = 15000; // 15s por página
+
+function renderPage(){
+  if (!lastData) return;
+  PAGES[currentPage](lastData);
+}
+
 async function load(){
   try{
     const resp = await fetch(API_URL);
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const data = await resp.json();
     if (data.erro) throw new Error(data.erro);
-    render(data);
+    lastData = data;
+    renderPage();
   }catch(err){
     document.getElementById("app").innerHTML =
       `<div class="error">Erro ao carregar painel: ${err.message}. Tentando de novo em ${REFRESH_MS/1000}s…</div>`;
@@ -341,6 +520,10 @@ async function load(){
 
 load();
 setInterval(load, REFRESH_MS);
+setInterval(() => {
+  currentPage = (currentPage + 1) % PAGES.length;
+  renderPage();
+}, CAROUSEL_MS);
 </script>
 </body>
 </html>
