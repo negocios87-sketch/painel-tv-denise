@@ -11,15 +11,19 @@
     --bg: #08080A;
     --panel: #131315;
     --panel-2: #1B1B1E;
-    --line: #29292C;
+    --line: #2C2C2F;
     --line-soft: #1F1F22;
-    --gold: #B8923F;
-    --gold-bright: #D4B166;
-    --white: #EDEDEA;
-    --dim: #7C7C80;
-    --mid: #A8A8AA;
-    --neg: #9A5A4A;
-    --pos: var(--gold);
+    --gold: #C9A24B;
+    --gold-bright: #E8C878;
+    --white: #F1F1EE;
+    --dim: #85858A;
+    --mid: #B4B4B6;
+    --neg: #B15B4A;
+
+    /* toques de cor por squad — dessaturados de propósito, não neon */
+    --sniper: #6E8BAE;
+    --elite: #B15B4A;
+    --olympus: #5C9578;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{
@@ -31,6 +35,9 @@
   #app{
     display:flex; flex-direction:column; gap:16px;
     padding:22px 30px; height:100vh;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(201,162,75,0.10), transparent 60%),
+      var(--bg);
   }
 
   /* ── Header ─────────────────────────── */
@@ -40,13 +47,14 @@
     padding-bottom:16px;
   }
   .header .brand{ display:flex; align-items:center; gap:18px; }
-  .header .logo{ height:42px; width:auto; object-fit:contain; filter:grayscale(15%); }
+  .header .logo{ height:42px; width:auto; object-fit:contain; }
   .header .eyebrow{
     font-size:12px; letter-spacing:4px; color:var(--gold); font-weight:600;
   }
   .header h1{
     font-size:26px; font-weight:700; letter-spacing:0.5px; margin-top:3px;
     color:var(--white);
+    text-shadow:0 0 24px rgba(201,162,75,0.25);
   }
   .header .meta{ text-align:right; font-size:13px; color:var(--dim); line-height:1.6; }
   .header .meta b{ color:var(--mid); font-weight:600; }
@@ -60,12 +68,12 @@
     content:""; position:absolute; top:0; left:0; width:100%; height:2px;
     background:var(--line-soft);
   }
-  .card.on::before{ background:var(--gold); }
-  .card.off::before{ background:var(--neg); }
+  .card.on::before{ background:var(--gold); box-shadow:0 0 10px rgba(201,162,75,0.6); }
+  .card.off::before{ background:var(--neg); box-shadow:0 0 10px rgba(177,91,74,0.5); }
   .card .label{ font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; font-weight:600; }
   .card .value{ font-size:32px; font-weight:700; margin-top:6px; color:var(--white); }
   .card .sub{ font-size:12px; color:var(--dim); margin-top:6px; }
-  .pos{ color:var(--gold); }
+  .pos{ color:var(--gold-bright); text-shadow:0 0 10px rgba(201,162,75,0.35); }
   .neg{ color:var(--neg); }
 
   /* ── Squad cards ────────────────────────── */
@@ -73,9 +81,13 @@
   .squad-card{
     background:var(--panel); padding:18px 22px; position:relative;
   }
+  .squad-card::before{
+    content:""; position:absolute; top:0; left:0; width:100%; height:3px;
+    background:var(--accent, var(--gold));
+  }
   .squad-card .sq-name{
     font-size:13px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase;
-    color:var(--dim);
+    color:var(--accent, var(--gold));
   }
   .squad-card .sq-pct{ font-size:40px; font-weight:700; margin:4px 0 12px; color:var(--white); }
   .squad-card .row{
@@ -87,7 +99,7 @@
     position:relative; height:3px; background:var(--panel-2);
     margin:10px 0 6px; overflow:hidden;
   }
-  .ritmo-fill{ position:absolute; top:0; left:0; height:100%; background:var(--gold); }
+  .ritmo-fill{ position:absolute; top:0; left:0; height:100%; background:var(--accent, var(--gold)); }
 
   /* ── Top3 lists ─────────────────────────── */
   .lists{ display:grid; grid-template-columns:1fr 1fr; gap:20px; flex:1; min-height:0; }
@@ -108,22 +120,23 @@
   .item .avatar{
     position:absolute; top:0; left:0;
     width:44px; height:44px; border-radius:50%; object-fit:cover;
-    background:var(--panel-2); border:1px solid var(--line); display:block;
-    filter:grayscale(55%) contrast(1.05);
+    background:var(--panel-2); display:block;
+    box-shadow:0 0 0 2px var(--accent, var(--gold)), 0 0 14px rgba(201,162,75,0.25);
   }
   .item .avatar-fallback{
     position:absolute; top:0; left:0;
     width:44px; height:44px; border-radius:50%; display:none;
     align-items:center; justify-content:center; font-weight:700; font-size:14px;
-    background:var(--panel-2); border:1px solid var(--line); color:var(--dim);
+    background:var(--panel-2); color:var(--dim);
+    box-shadow:0 0 0 2px var(--accent, var(--gold));
   }
   .item .info{ flex:1; }
   .item .name{ font-size:16px; font-weight:600; color:var(--white); }
   .item .squad-tag{
-    font-size:10px; color:var(--dim); text-transform:uppercase;
-    letter-spacing:1.5px; margin-top:1px;
+    font-size:10px; color:var(--accent, var(--dim)); text-transform:uppercase;
+    letter-spacing:1.5px; margin-top:1px; font-weight:600;
   }
-  .item .pct{ font-size:23px; font-weight:700; text-align:right; color:var(--white); }
+  .item .pct{ font-size:23px; font-weight:700; text-align:right; color:var(--gold-bright); }
   .item .delta{ font-size:11px; text-align:right; margin-top:2px; }
 
   .loading, .error{
@@ -143,6 +156,7 @@ const REFRESH_MS = 60000; // 60s — ajuste aqui se quiser outro intervalo
 const FOTO_BASE = "https://raw.githubusercontent.com/negocios87-sketch/fotos_time_comercial/main";
 const LOGO_URL = "https://raw.githubusercontent.com/negocios87-sketch/fotos_time_comercial/main/logo_board.png";
 const PHOTO_EXTS = ["jpg", "jpeg", "png"];
+const SQUAD_ACCENT = { "Sniper": "var(--sniper)", "Elite": "var(--elite)", "Olympus": "var(--olympus)" };
 
 function fmtMoney(v){
   if (v === null || v === undefined) return "—";
@@ -153,6 +167,7 @@ function fmtMoney(v){
 }
 function fmtPct(v){ return (v === null || v === undefined) ? "—" : `${v.toFixed(1)}%`; }
 function fmtNum(v, d=1){ return (v === null || v === undefined) ? "—" : v.toFixed(d); }
+function fmtInt(v){ return (v === null || v === undefined) ? "—" : String(Math.round(v)); }
 function cls(v){ return v >= 0 ? "pos" : "neg"; }
 function arrow(v){ return v >= 0 ? "▲" : "▼"; }
 function iniciais(nome){
@@ -160,7 +175,7 @@ function iniciais(nome){
 }
 
 // Tenta .jpg → .jpeg → .png antes de cair pras iniciais.
-// Fica exposta em window pq é chamada via onerror inline no HTML gerado.
+// Exposta em window pq é chamada via onerror inline no HTML gerado.
 window.handlePhotoError = function(img){
   const idx = parseInt(img.dataset.extIdx || "0", 10) + 1;
   if (idx < PHOTO_EXTS.length){
@@ -172,10 +187,11 @@ window.handlePhotoError = function(img){
   }
 };
 
-function avatarHTML(nome){
+function avatarHTML(nome, accent){
   const encoded = encodeURIComponent(nome);
+  const style = accent ? `style="--accent:${accent}"` : "";
   return `
-    <div class="avatar-wrap">
+    <div class="avatar-wrap" ${style}>
       <img class="avatar" data-name="${encoded}" data-ext-idx="0"
            src="${FOTO_BASE}/${encoded}.${PHOTO_EXTS[0]}" alt="${nome}"
            onerror="handlePhotoError(this)">
@@ -186,27 +202,31 @@ function avatarHTML(nome){
 const MARCO_LABEL = "vs. checkpoint 40%";
 
 function squadCardHTML(sq){
+  const accent = SQUAD_ACCENT[sq.nome] || "var(--gold)";
+  const isReuniao = sq.tipo === "reunioes";
+  const fmtVal = isReuniao ? (v => fmtInt(v)) : fmtMoney;
   const fillPct = Math.max(0, Math.min(100, (sq.real_dia / (sq.meta_dia || 1)) * 100));
   return `
-  <div class="squad-card">
+  <div class="squad-card" style="--accent:${accent}">
     <div class="sq-name">${sq.nome}</div>
     <div class="sq-pct">${fmtPct(sq.ating_pct)}</div>
     <div class="ritmo-track"><div class="ritmo-fill" style="width:${fillPct}%"></div></div>
-    <div class="row"><span>Meta/dia</span><span class="num">${fmtMoney(sq.meta_dia)}</span></div>
-    <div class="row"><span>Vendido hoje</span><span class="num">${fmtMoney(sq.real_dia)}</span></div>
-    <div class="row"><span>Gap/dia</span><span class="num ${cls(sq.gap_dia)}">${fmtMoney(sq.gap_dia)}</span></div>
+    <div class="row"><span>${isReuniao ? "Meta reuniões/dia" : "Meta/dia"}</span><span class="num">${fmtVal(sq.meta_dia)}</span></div>
+    <div class="row"><span>${isReuniao ? "Reuniões hoje" : "Vendido hoje"}</span><span class="num">${fmtVal(sq.real_dia)}</span></div>
+    <div class="row"><span>Gap/dia</span><span class="num ${cls(sq.gap_dia)}">${fmtVal(sq.gap_dia)}</span></div>
     <div class="row"><span>${MARCO_LABEL}</span><span class="num">${fmtPct(sq.marco_pct)}</span></div>
   </div>`;
 }
 
 function closerItemHTML(c, i){
+  const accent = SQUAD_ACCENT[c.squad] || "var(--gold)";
   return `
   <div class="item">
     <div class="rank">0${i+1}</div>
-    ${avatarHTML(c.nome)}
+    ${avatarHTML(c.nome, accent)}
     <div class="info">
       <div class="name">${c.nome}</div>
-      <div class="squad-tag">${c.squad}</div>
+      <div class="squad-tag" style="--accent:${accent}">${c.squad}</div>
     </div>
     <div>
       <div class="pct">${fmtPct(c.pct)}</div>
@@ -219,7 +239,7 @@ function sdrItemHTML(s, i){
   return `
   <div class="item">
     <div class="rank">0${i+1}</div>
-    ${avatarHTML(s.nome)}
+    ${avatarHTML(s.nome, "var(--gold)")}
     <div class="info">
       <div class="name">${s.nome}</div>
       <div class="squad-tag">${s.lider || "—"}</div>
