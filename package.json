@@ -1,0 +1,9 @@
+{
+  "name": "painel-tv-denise",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Painel TV comercial — Time Denise (Sniper/Elite/Olympus), Board Academy",
+  "engines": {
+    "node": ">=18"
+  }
+}

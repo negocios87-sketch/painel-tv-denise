@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Painel Comercial — Time Denise</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0B0B0D;
+    --panel: #16161A;
+    --panel-2: #1D1D22;
+    --line: #2A2A31;
+    --yellow: #F4C430;
+    --white: #F5F5F0;
+    --dim: #8A8A93;
+    --green: #34D399;
+    --red: #F0533D;
+    --blue: #5B9BF0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    background:var(--bg); color:var(--white);
+    font-family:'Barlow Condensed', 'Arial Narrow', sans-serif;
+    width:100%; height:100%; overflow:hidden;
+  }
+  .num{font-family:'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;}
+  #app{
+    display:flex; flex-direction:column; gap:14px;
+    padding:20px 26px; height:100vh;
+  }
+
+  /* ── Header ─────────────────────────── */
+  .header{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 22px;
+  }
+  .header .eyebrow{
+    font-size:13px; letter-spacing:3px; color:var(--yellow); font-weight:700;
+  }
+  .header h1{
+    font-size:26px; font-weight:700; letter-spacing:0.3px; margin-top:2px;
+  }
+  .header .meta{ text-align:right; font-size:14px; color:var(--dim); }
+  .header .meta b{ color:var(--white); }
+
+  /* ── Top summary cards ─────────────────── */
+  .top-cards{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 18px;
+  }
+  .card .label{ font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:1px;}
+  .card .value{ font-size:34px; font-weight:700; margin-top:4px; }
+  .card .sub{ font-size:13px; color:var(--dim); margin-top:6px; }
+  .card.gap-card{ border-color:#3a2020; }
+  .card.needed-card{ border-color:#3a3320; }
+  .pos{ color:var(--green); }
+  .neg{ color:var(--red); }
+
+  /* ── Squad cards ────────────────────────── */
+  .squad-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .squad-card{
+    background:var(--panel); border:2px solid var(--line); border-radius:12px;
+    padding:16px 20px; position:relative; overflow:hidden;
+  }
+  .squad-card.oly{ border-color:#1e4a35; }
+  .squad-card.eli{ border-color:#4a1e1e; }
+  .squad-card.sni{ border-color:#2a2a5a; }
+  .squad-card .sq-name{ font-size:16px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; }
+  .squad-card .sq-pct{ font-size:44px; font-weight:800; margin:2px 0 10px; }
+  .squad-card .row{
+    display:flex; justify-content:space-between; font-size:14px;
+    padding:5px 0; border-top:1px solid var(--line);
+  }
+  .squad-card .row span:first-child{ color:var(--dim); }
+  .ritmo-track{
+    position:relative; height:8px; background:var(--panel-2);
+    border-radius:5px; margin:10px 0 4px; overflow:hidden;
+  }
+  .ritmo-fill{ position:absolute; top:0; left:0; height:100%; border-radius:5px; }
+
+  /* ── Top3 lists ─────────────────────────── */
+  .lists{ display:grid; grid-template-columns:1fr 1fr; gap:14px; flex:1; min-height:0; }
+  .list-block h2{
+    font-size:14px; letter-spacing:2px; color:var(--dim); text-transform:uppercase;
+    margin-bottom:8px; font-weight:600;
+  }
+  .list-items{ display:flex; flex-direction:column; gap:8px; }
+  .item{
+    display:flex; align-items:center; gap:14px;
+    background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--yellow);
+    border-radius:8px; padding:10px 16px;
+  }
+  .item:nth-child(1){ border-left-color:#F4C430; }
+  .item:nth-child(2){ border-left-color:#C9C9D1; }
+  .item:nth-child(3){ border-left-color:#B87333; }
+  .item .medal{ font-size:20px; width:26px; text-align:center; }
+  .item .info{ flex:1; }
+  .item .name{ font-size:17px; font-weight:600; }
+  .item .squad-tag{
+    font-size:11px; color:var(--dim); text-transform:uppercase;
+    letter-spacing:1px;
+  }
+  .item .pct{ font-size:26px; font-weight:800; text-align:right; }
+  .item .delta{ font-size:12px; text-align:right; }
+
+  .loading, .error{
+    display:flex; align-items:center; justify-content:center;
+    height:100vh; color:var(--dim); font-size:20px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="loading" id="loading">Carregando painel…</div>
+</div>
+
+<script>
+const API_URL = "/api/painel-tv";
+const REFRESH_MS = 60000; // 60s — ajuste aqui se quiser outro intervalo
+
+function fmtMoney(v){
+  if (v === null || v === undefined) return "—";
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "-" : "";
+  if (abs >= 1000) return `${sign}R$ ${(abs/1000).toFixed(1)}k`;
+  return `${sign}R$ ${abs.toFixed(0)}`;
+}
+function fmtPct(v){ return (v === null || v === undefined) ? "—" : `${v.toFixed(1)}%`; }
+function fmtNum(v, d=1){ return (v === null || v === undefined) ? "—" : v.toFixed(d); }
+function cls(v){ return v >= 0 ? "pos" : "neg"; }
+function arrow(v){ return v >= 0 ? "▲" : "▼"; }
+
+const SQUAD_CLASS = { "Olympus":"oly", "Elite":"eli", "Sniper":"sni" };
+const SQUAD_COLOR = { "Olympus":"#34D399", "Elite":"#F0533D", "Sniper":"#5B9BF0" };
+
+function squadCardHTML(sq){
+  const color = SQUAD_COLOR[sq.nome] || "#F4C430";
+  const cardClass = SQUAD_CLASS[sq.nome] || "";
+  const fillPct = Math.max(0, Math.min(100, (sq.real_dia / (sq.meta_dia || 1)) * 100));
+  return `
+  <div class="squad-card ${cardClass}">
+    <div class="sq-name" style="color:${color}">${sq.nome}</div>
+    <div class="sq-pct" style="color:${color}">${fmtPct(sq.ating_pct)}</div>
+    <div class="ritmo-track"><div class="ritmo-fill" style="width:${fillPct}%; background:${color}"></div></div>
+    <div class="row"><span>Meta/dia</span><span class="num">${fmtMoney(sq.meta_dia)}</span></div>
+    <div class="row"><span>Ritmo atual</span><span class="num">${fmtMoney(sq.real_dia)}</span></div>
+    <div class="row"><span>Gap/dia</span><span class="num ${cls(sq.gap_dia)}">${fmtMoney(sq.gap_dia)}</span></div>
+    <div class="row"><span>${MARCO_LABEL}</span><span class="num">${fmtPct(sq.marco_pct)}</span></div>
+  </div>`;
+}
+
+const MARCO_LABEL = "vs. checkpoint 40%";
+
+function closerItemHTML(c, i){
+  const medals = ["🥇","🥈","🥉"];
+  return `
+  <div class="item">
+    <div class="medal">${medals[i]}</div>
+    <div class="info">
+      <div class="name">${c.nome}</div>
+      <div class="squad-tag">${c.squad}</div>
+    </div>
+    <div>
+      <div class="pct" style="color:${SQUAD_COLOR[c.squad] || 'var(--yellow)'}">${fmtPct(c.pct)}</div>
+      <div class="delta num ${cls(c.delta_dia)}">${arrow(c.delta_dia)} ${fmtMoney(Math.abs(c.delta_dia))}/dia</div>
+    </div>
+  </div>`;
+}
+
+function sdrItemHTML(s, i){
+  const medals = ["🥇","🥈","🥉"];
+  return `
+  <div class="item">
+    <div class="medal">${medals[i]}</div>
+    <div class="info">
+      <div class="name">${s.nome}</div>
+      <div class="squad-tag">${s.lider || "—"}</div>
+    </div>
+    <div>
+      <div class="pct" style="color:var(--yellow)">${fmtPct(s.pct)}</div>
+      <div class="delta num ${cls(s.delta_dia)}">${arrow(s.delta_dia)} ${fmtNum(Math.abs(s.delta_dia))}/dia</div>
+    </div>
+  </div>`;
+}
+
+function render(d){
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="header">
+      <div>
+        <div class="eyebrow">DASHBOARD COMERCIAL · TIME DENISE</div>
+        <h1>Meta diária · Ritmo · Checkpoint 40%</h1>
+      </div>
+      <div class="meta">
+        ${d.periodo.data} · ${d.periodo.du_dec} DU decorridos · ${d.periodo.du_rest} DU restantes<br>
+        <b>Base: ${d.periodo.du_total} DU no mês</b>
+      </div>
+    </div>
+
+    <div class="top-cards">
+      <div class="card">
+        <div class="label">Meta diária closers</div>
+        <div class="value num">${fmtMoney(d.meta_diaria_closers)}</div>
+        <div class="sub">com multiplicador</div>
+      </div>
+      <div class="card">
+        <div class="label">Ritmo atual (MTD/DU)</div>
+        <div class="value num">${fmtMoney(d.ritmo_atual_closers)}</div>
+        <div class="sub">média realizada por dia útil</div>
+      </div>
+      <div class="card gap-card">
+        <div class="label">Gap diário (ritmo vs meta)</div>
+        <div class="value num ${cls(d.gap_diario_simples)}">${fmtMoney(d.gap_diario_simples)}</div>
+        <div class="sub">diferença do ritmo atual pra meta/dia</div>
+      </div>
+      <div class="card needed-card">
+        <div class="label">Ritmo necessário p/ bater 100%</div>
+        <div class="value num" style="color:var(--yellow)">${fmtMoney(d.ritmo_necessario_100)}/dia</div>
+        <div class="sub">nos ${d.periodo.du_rest} DU restantes</div>
+      </div>
+    </div>
+
+    <div class="squad-row">
+      ${d.squads.map(squadCardHTML).join("")}
+    </div>
+
+    <div class="lists">
+      <div class="list-block">
+        <h2>Top 3 Closers — % atingimento mensal</h2>
+        <div class="list-items">${d.top_closers.map(closerItemHTML).join("")}</div>
+      </div>
+      <div class="list-block">
+        <h2>Top 3 SDRs — % atingimento mensal</h2>
+        <div class="list-items">${d.top_sdrs.map(sdrItemHTML).join("")}</div>
+      </div>
+    </div>
+  `;
+}
+
+async function load(){
+  try{
+    const resp = await fetch(API_URL);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const data = await resp.json();
+    if (data.erro) throw new Error(data.erro);
+    render(data);
+  }catch(err){
+    document.getElementById("app").innerHTML =
+      `<div class="error">Erro ao carregar painel: ${err.message}. Tentando de novo em ${REFRESH_MS/1000}s…</div>`;
+    console.error(err);
+  }
+}
+
+load();
+setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>
