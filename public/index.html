@@ -147,7 +147,7 @@ function squadCardHTML(sq){
     <div class="sq-pct" style="color:${color}">${fmtPct(sq.ating_pct)}</div>
     <div class="ritmo-track"><div class="ritmo-fill" style="width:${fillPct}%; background:${color}"></div></div>
     <div class="row"><span>Meta/dia</span><span class="num">${fmtMoney(sq.meta_dia)}</span></div>
-    <div class="row"><span>Ritmo atual</span><span class="num">${fmtMoney(sq.real_dia)}</span></div>
+    <div class="row"><span>Vendido hoje</span><span class="num">${fmtMoney(sq.real_dia)}</span></div>
     <div class="row"><span>Gap/dia</span><span class="num ${cls(sq.gap_dia)}">${fmtMoney(sq.gap_dia)}</span></div>
     <div class="row"><span>${MARCO_LABEL}</span><span class="num">${fmtPct(sq.marco_pct)}</span></div>
   </div>`;
@@ -166,7 +166,7 @@ function closerItemHTML(c, i){
     </div>
     <div>
       <div class="pct" style="color:${SQUAD_COLOR[c.squad] || 'var(--yellow)'}">${fmtPct(c.pct)}</div>
-      <div class="delta num ${cls(c.delta_dia)}">${arrow(c.delta_dia)} ${fmtMoney(Math.abs(c.delta_dia))}/dia</div>
+      <div class="delta num ${cls(c.delta_dia)}">${arrow(c.delta_dia)} ${fmtMoney(Math.abs(c.delta_dia))} vs meta hoje</div>
     </div>
   </div>`;
 }
@@ -182,7 +182,7 @@ function sdrItemHTML(s, i){
     </div>
     <div>
       <div class="pct" style="color:var(--yellow)">${fmtPct(s.pct)}</div>
-      <div class="delta num ${cls(s.delta_dia)}">${arrow(s.delta_dia)} ${fmtNum(Math.abs(s.delta_dia))}/dia</div>
+      <div class="delta num ${cls(s.delta_dia)}">${arrow(s.delta_dia)} ${fmtNum(Math.abs(s.delta_dia))} vs meta hoje</div>
     </div>
   </div>`;
 }
@@ -208,19 +208,37 @@ function render(d){
         <div class="sub">com multiplicador</div>
       </div>
       <div class="card">
-        <div class="label">Ritmo atual (MTD/DU)</div>
-        <div class="value num">${fmtMoney(d.ritmo_atual_closers)}</div>
-        <div class="sub">média realizada por dia útil</div>
+        <div class="label">Vendido hoje</div>
+        <div class="value num">${fmtMoney(d.realizado_hoje_closers)}</div>
+        <div class="sub">deals fechados hoje, calendário</div>
       </div>
       <div class="card gap-card">
-        <div class="label">Gap diário (ritmo vs meta)</div>
+        <div class="label">Gap diário (hoje vs meta)</div>
         <div class="value num ${cls(d.gap_diario_simples)}">${fmtMoney(d.gap_diario_simples)}</div>
-        <div class="sub">diferença do ritmo atual pra meta/dia</div>
+        <div class="sub">vendido hoje − meta do dia</div>
       </div>
       <div class="card needed-card">
         <div class="label">Ritmo necessário p/ bater 100%</div>
         <div class="value num" style="color:var(--yellow)">${fmtMoney(d.ritmo_necessario_100)}/dia</div>
         <div class="sub">nos ${d.periodo.du_rest} DU restantes</div>
+      </div>
+    </div>
+
+    <div class="top-cards" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card">
+        <div class="label">Meta reuniões/dia</div>
+        <div class="value num" style="color:var(--blue)">${fmtNum(d.meta_reunioes_dia,1)}/dia</div>
+        <div class="sub">time Denise, SDRs</div>
+      </div>
+      <div class="card">
+        <div class="label">Reuniões hoje</div>
+        <div class="value num" style="color:var(--blue)">${d.reunioes_hoje ?? "—"}</div>
+        <div class="sub">validadas hoje, calendário</div>
+      </div>
+      <div class="card gap-card">
+        <div class="label">Gap de reuniões</div>
+        <div class="value num ${cls(d.gap_reunioes)}">${fmtNum(d.gap_reunioes,1)}</div>
+        <div class="sub">reuniões hoje − meta do dia</div>
       </div>
     </div>
 
