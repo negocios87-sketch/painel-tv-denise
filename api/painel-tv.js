@@ -179,15 +179,17 @@ function duRestantes(ano, mes, feriadosSet) {
   }
   return count;
 }
-// Dias úteis entre AMANHÃ (BRT) e uma data-alvo específica, inclusive.
+// Dias úteis entre HOJE (BRT, inclusive) e uma data-alvo específica, inclusive.
+// Hoje conta como dia disponível — o que for feito hoje ainda entra na conta
+// do mês, então não faz sentido excluir o dia de hoje do prazo.
 // Usado pros cortes de checkpoint (dia 16 e último dia do mês).
 function duAteData(anoAlvo, mesAlvo, diaAlvo, feriadosSet) {
   const hojeStr = hojeBRTStr();
   const hojeDt = new Date(hojeStr + "T00:00:00Z");
   const alvoDt = new Date(Date.UTC(anoAlvo, mesAlvo - 1, diaAlvo));
-  if (alvoDt <= hojeDt) return 0; // corte já passou
+  if (alvoDt < hojeDt) return 0; // corte já passou de verdade (ontem ou antes)
   let count = 0;
-  for (let d = new Date(hojeDt.getTime() + 86400000); d <= alvoDt; d = new Date(d.getTime() + 86400000)) {
+  for (let d = new Date(hojeDt.getTime()); d <= alvoDt; d = new Date(d.getTime() + 86400000)) {
     if (isWeekday(d) && !feriadosSet.has(ymd(d))) count++;
   }
   return count;
@@ -685,7 +687,9 @@ export default async function handler(req, res) {
     // ══════════════════════════════════════════════════════════
     const ultimoDiaMes = daysInMonth(ano, mes);
     const diasAteCorte40 = duAteData(ano, mes, CORTE_40_DIA, feriados);
-    const corte40Vencido = diasAteCorte40 === 0 && hoje.getUTCDate() > CORTE_40_DIA;
+    // "Vencido" = a data do corte já passou por completo (ontem ou antes).
+    // Se hoje é o próprio dia do corte, ainda não venceu — hoje ainda conta.
+    const corte40Vencido = new Date(hojeBRTStr() + "T00:00:00Z") > new Date(Date.UTC(ano, mes - 1, CORTE_40_DIA));
     const diasAteCorte100 = duRest; // corte 100% = último DU do mês, já calculado
 
     function classificarRitmo(bateu, requerido, normal) {
