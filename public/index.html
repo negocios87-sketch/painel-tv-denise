@@ -34,20 +34,22 @@
   /* ── Header ─────────────────────────── */
   .header{
     display:flex; justify-content:space-between; align-items:center;
-    background:var(--panel); border:1px solid var(--line); border-radius:10px;
-    padding:14px 22px;
+    background:transparent; border:none; border-bottom:2px solid var(--line);
+    padding:8px 4px 16px;
   }
+  .header .brand{ display:flex; align-items:center; gap:16px; }
+  .header .logo{ height:46px; width:auto; object-fit:contain; }
   .header .eyebrow{
     font-size:13px; letter-spacing:3px; color:var(--yellow); font-weight:700;
   }
   .header h1{
-    font-size:26px; font-weight:700; letter-spacing:0.3px; margin-top:2px;
+    font-size:28px; font-weight:800; letter-spacing:0.3px; margin-top:2px;
   }
   .header .meta{ text-align:right; font-size:14px; color:var(--dim); }
   .header .meta b{ color:var(--white); }
 
   /* ── Top summary cards ─────────────────── */
-  .top-cards{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .top-cards{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
   .card{
     background:var(--panel); border:1px solid var(--line); border-radius:10px;
     padding:14px 18px;
@@ -90,14 +92,30 @@
   }
   .list-items{ display:flex; flex-direction:column; gap:8px; }
   .item{
-    display:flex; align-items:center; gap:14px;
+    display:flex; align-items:center; gap:14px; position:relative;
     background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--yellow);
     border-radius:8px; padding:10px 16px;
   }
   .item:nth-child(1){ border-left-color:#F4C430; }
   .item:nth-child(2){ border-left-color:#C9C9D1; }
   .item:nth-child(3){ border-left-color:#B87333; }
-  .item .medal{ font-size:20px; width:26px; text-align:center; }
+  .item .medal{
+    position:absolute; top:-4px; left:-4px; font-size:15px; width:22px; height:22px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--panel-2); border-radius:50%; border:1px solid var(--line);
+  }
+  .item .avatar-wrap{ position:relative; width:48px; height:48px; flex-shrink:0; }
+  .item .avatar{
+    position:absolute; top:0; left:0;
+    width:48px; height:48px; border-radius:50%; object-fit:cover;
+    background:var(--panel-2); border:2px solid var(--line); display:block;
+  }
+  .item .avatar-fallback{
+    position:absolute; top:0; left:0;
+    width:48px; height:48px; border-radius:50%; display:none;
+    align-items:center; justify-content:center; font-weight:700; font-size:16px;
+    background:var(--panel-2); border:2px solid var(--line); color:var(--dim);
+  }
   .item .info{ flex:1; }
   .item .name{ font-size:17px; font-weight:600; }
   .item .squad-tag{
@@ -136,6 +154,21 @@ function arrow(v){ return v >= 0 ? "▲" : "▼"; }
 
 const SQUAD_CLASS = { "Olympus":"oly", "Elite":"eli", "Sniper":"sni" };
 const SQUAD_COLOR = { "Olympus":"#34D399", "Elite":"#F0533D", "Sniper":"#5B9BF0" };
+const FOTO_BASE = "https://raw.githubusercontent.com/negocios87-sketch/fotos_time_comercial/main";
+const LOGO_URL = "https://raw.githubusercontent.com/negocios87-sketch/fotos_time_comercial/main/logo_board.png";
+
+function iniciais(nome){
+  return (nome || "").trim().split(/\s+/).slice(0,2).map(p => p[0]).join("").toUpperCase();
+}
+function avatarHTML(nome){
+  const src = `${FOTO_BASE}/${encodeURIComponent(nome)}.jpg`;
+  return `
+    <div class="avatar-wrap">
+      <img class="avatar" src="${src}" alt="${nome}"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <div class="avatar-fallback">${iniciais(nome)}</div>
+    </div>`;
+}
 
 function squadCardHTML(sq){
   const color = SQUAD_COLOR[sq.nome] || "#F4C430";
@@ -160,6 +193,7 @@ function closerItemHTML(c, i){
   return `
   <div class="item">
     <div class="medal">${medals[i]}</div>
+    ${avatarHTML(c.nome)}
     <div class="info">
       <div class="name">${c.nome}</div>
       <div class="squad-tag">${c.squad}</div>
@@ -176,6 +210,7 @@ function sdrItemHTML(s, i){
   return `
   <div class="item">
     <div class="medal">${medals[i]}</div>
+    ${avatarHTML(s.nome)}
     <div class="info">
       <div class="name">${s.nome}</div>
       <div class="squad-tag">${s.lider || "—"}</div>
@@ -191,9 +226,13 @@ function render(d){
   const app = document.getElementById("app");
   app.innerHTML = `
     <div class="header">
-      <div>
-        <div class="eyebrow">DASHBOARD COMERCIAL · TIME DENISE</div>
-        <h1>Meta diária · Ritmo · Checkpoint 40%</h1>
+      <div class="brand">
+        <img class="logo" src="${LOGO_URL}" alt="Board Academy"
+             onerror="this.style.display='none';">
+        <div>
+          <div class="eyebrow">TIME DENISE · TEMPO REAL</div>
+          <h1>Ritmo do Dia</h1>
+        </div>
       </div>
       <div class="meta">
         ${d.periodo.data} · ${d.periodo.du_dec} DU decorridos · ${d.periodo.du_rest} DU restantes<br>
@@ -217,14 +256,6 @@ function render(d){
         <div class="value num ${cls(d.gap_diario_simples)}">${fmtMoney(d.gap_diario_simples)}</div>
         <div class="sub">vendido hoje − meta do dia</div>
       </div>
-      <div class="card needed-card">
-        <div class="label">Ritmo necessário p/ bater 100%</div>
-        <div class="value num" style="color:var(--yellow)">${fmtMoney(d.ritmo_necessario_100)}/dia</div>
-        <div class="sub">nos ${d.periodo.du_rest} DU restantes</div>
-      </div>
-    </div>
-
-    <div class="top-cards" style="grid-template-columns:repeat(3,1fr)">
       <div class="card">
         <div class="label">Meta reuniões/dia</div>
         <div class="value num" style="color:var(--blue)">${fmtNum(d.meta_reunioes_dia,1)}/dia</div>
@@ -236,7 +267,7 @@ function render(d){
         <div class="sub">validadas hoje, calendário</div>
       </div>
       <div class="card gap-card">
-        <div class="label">Gap de reuniões</div>
+        <div class="label">Gap de reuniões hoje</div>
         <div class="value num ${cls(d.gap_reunioes)}">${fmtNum(d.gap_reunioes,1)}</div>
         <div class="sub">reuniões hoje − meta do dia</div>
       </div>
