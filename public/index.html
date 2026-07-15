@@ -117,13 +117,16 @@
     font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700;
     color:var(--gold); width:22px; flex-shrink:0;
   }
-  .item .avatar-wrap{ position:relative; width:44px; height:44px; flex-shrink:0; }
-  .item .avatar{
+  .avatar-wrap{ position:relative; background:var(--panel-2); border-radius:50%; flex-shrink:0; }
+  .item .avatar-wrap{ width:44px; height:44px; }
+  .avatar{
     position:absolute; top:0; left:0;
     width:44px; height:44px; border-radius:50%; object-fit:cover;
     background:var(--panel-2); display:block;
     box-shadow:0 0 0 2px var(--accent, var(--gold)), 0 0 16px rgba(212,169,71,0.35);
+    opacity:0; transition:opacity 0.2s ease;
   }
+  .avatar.loaded{ opacity:1; }
   .item .avatar-fallback{
     position:absolute; top:0; left:0;
     width:44px; height:44px; border-radius:50%; display:none;
@@ -200,6 +203,15 @@
     font-size:13px; font-weight:700; color:var(--white); padding:8px 10px;
     border:1px solid var(--gold); border-top:none; background:var(--panel-2);
   }
+
+  .nav-dots{
+    position:fixed; bottom:14px; right:20px; display:flex; gap:8px; z-index:50;
+  }
+  .nav-dots .dot{
+    width:8px; height:8px; border-radius:50%; border:1px solid var(--line);
+    background:var(--panel-2); cursor:pointer; padding:0;
+  }
+  .nav-dots .dot.active{ background:var(--gold); border-color:var(--gold); }
 </style>
 </head>
 <body>
@@ -252,6 +264,7 @@ function avatarHTML(nome, accent){
     <div class="avatar-wrap" ${style}>
       <img class="avatar" data-name="${encoded}" data-ext-idx="0"
            src="${FOTO_BASE}/${encoded}.${PHOTO_EXTS[0]}" alt="${nome}"
+           onload="this.classList.add('loaded')"
            onerror="handlePhotoError(this)">
       <div class="avatar-fallback">${iniciais(nome)}</div>
     </div>`;
@@ -496,12 +509,53 @@ function renderMetas(d){
 let lastData = null;
 let currentPage = 0;
 const PAGES = [renderRitmo, renderMetas];
+const PAGE_NAMES = ["Ritmo do Dia", "Painel de Metas"];
 const CAROUSEL_MS = 15000; // 15s por página
+let carouselTimer = null;
 
 function renderPage(){
   if (!lastData) return;
   PAGES[currentPage](lastData);
+  renderNavDots();
 }
+
+function renderNavDots(){
+  let nav = document.getElementById("nav-dots");
+  if (!nav){
+    nav = document.createElement("div");
+    nav.id = "nav-dots";
+    nav.className = "nav-dots";
+    document.body.appendChild(nav);
+  }
+  nav.innerHTML = PAGES.map((_, i) =>
+    `<button class="dot ${i === currentPage ? 'active' : ''}" data-page="${i}" title="${PAGE_NAMES[i]}"></button>`
+  ).join("");
+  nav.querySelectorAll(".dot").forEach(btn => {
+    btn.onclick = (e) => { e.stopPropagation(); goToPage(parseInt(btn.dataset.page, 10)); };
+  });
+}
+
+function goToPage(n){
+  currentPage = ((n % PAGES.length) + PAGES.length) % PAGES.length;
+  renderPage();
+  resetCarousel();
+}
+
+function resetCarousel(){
+  if (carouselTimer) clearInterval(carouselTimer);
+  carouselTimer = setInterval(() => goToPage(currentPage + 1), CAROUSEL_MS);
+}
+
+// Clique/toque em qualquer lugar da tela avança pra próxima página manualmente
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".dot")) return; // já tratado no próprio botão
+  goToPage(currentPage + 1);
+});
+// Setas do teclado, pra quem tiver controle remoto ou teclado ligado na TV
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight" || e.key === " ") goToPage(currentPage + 1);
+  if (e.key === "ArrowLeft") goToPage(currentPage - 1);
+});
 
 async function load(){
   try{
@@ -520,10 +574,7 @@ async function load(){
 
 load();
 setInterval(load, REFRESH_MS);
-setInterval(() => {
-  currentPage = (currentPage + 1) % PAGES.length;
-  renderPage();
-}, CAROUSEL_MS);
+resetCarousel();
 </script>
 </body>
 </html>
