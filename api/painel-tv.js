@@ -531,10 +531,16 @@ export default async function handler(req, res) {
       const tReu = ind.reduce((s, c) => s + c.meta_reuniao, 0);
       const tVal = ind.reduce((s, c) => s + c.validadas, 0);
       const tValHoje = ind.reduce((s, c) => s + (c.validadas_hoje || 0), 0);
+      // Média ponderada do % final pela meta de reunião de cada SDR
+      const pesoTotal = ind.reduce((s, c) => s + (c.meta_reuniao || 0), 0);
+      const pctFinalMedio = pesoTotal
+        ? arred(ind.reduce((s, c) => s + c.pct_final * (c.meta_reuniao || 0), 0) / pesoTotal)
+        : arred(ind.reduce((s, c) => s + c.pct_final, 0) / ind.length);
       return {
         meta_diaria: arred(safeDiv(tReu, duTotal)),
         validadas: tVal,
         validadas_hoje: tValHoje,
+        pct_final: pctFinalMedio,
       };
     }
 
@@ -556,15 +562,32 @@ export default async function handler(req, res) {
         totalReuValidadasHoje += ts.validadas_hoje;
       }
       const realHojeSq = tc ? tc.real_hoje : 0;
-      squadsCards.push({
-        nome,
-        ating_pct: tc ? tc.pct_atingido_multi : 0,
-        meta_dia: tc ? tc.meta_du : 0,
-        real_dia: realHojeSq,
-        // Gap = realizado hoje - meta do dia. Negativo = abaixo da meta (confirmado com o Rodrigo).
-        gap_dia: tc ? arred(realHojeSq - tc.meta_du) : 0,
-        marco_pct: tc ? arred(safeDiv(tc.pct_atingido_multi, MARCO_ATINGIMENTO) * 100) : 0,
-      });
+
+      if (tc) {
+        // Squad com meta de closer (Elite/Olympus) — métricas em R$
+        squadsCards.push({
+          nome, tipo: "financeiro",
+          ating_pct: tc.pct_atingido_multi,
+          meta_dia: tc.meta_du,
+          real_dia: realHojeSq,
+          gap_dia: arred(realHojeSq - tc.meta_du),
+          marco_pct: arred(safeDiv(tc.pct_atingido_multi, MARCO_ATINGIMENTO) * 100),
+        });
+      } else if (ts) {
+        // Squad 100% SDR (Sniper) — não tem meta de closer, então usa reuniões.
+        // Isso é o que resolve o card zerado: antes ele só olhava pra R$, que
+        // pro Sniper nunca vai existir.
+        squadsCards.push({
+          nome, tipo: "reunioes",
+          ating_pct: ts.pct_final,
+          meta_dia: ts.meta_diaria,
+          real_dia: ts.validadas_hoje,
+          gap_dia: arred(ts.validadas_hoje - ts.meta_diaria),
+          marco_pct: arred(safeDiv(ts.pct_final, MARCO_ATINGIMENTO) * 100),
+        });
+      } else {
+        squadsCards.push({ nome, tipo: "financeiro", ating_pct: 0, meta_dia: 0, real_dia: 0, gap_dia: 0, marco_pct: 0 });
+      }
     }
 
     const realizadoHojeClosers = arred(totalRealizadoHoje);
