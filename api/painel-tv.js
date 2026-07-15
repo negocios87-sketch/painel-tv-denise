@@ -54,6 +54,11 @@ function safeDiv(a, b) {
   if (!fb) return 0;
   return fa / fb;
 }
+function ceilSafeDiv(a, b) {
+  const fa = parseFloat(a), fb = parseFloat(b);
+  if (!fb) return 0;
+  return Math.ceil(fa / fb);
+}
 function cf(deal, key) {
   const val = deal[key];
   if (val === null || val === undefined) return null;
@@ -506,7 +511,7 @@ export default async function handler(req, res) {
       squadsOut[display].sdrs.push({
         nome: m.nome,
         lider: "", // não crítico pro painel — adicionar se precisar mapear team leader
-        meta_diaria: arred(safeDiv(m.meta_reu, duTotal)),
+        meta_diaria: ceilSafeDiv(m.meta_reu, duTotal),
         meta_reuniao: arred(m.meta_reu),
         validadas,
         validadas_hoje: validadasHoje,
@@ -537,7 +542,7 @@ export default async function handler(req, res) {
         ? arred(ind.reduce((s, c) => s + c.pct_final * (c.meta_reuniao || 0), 0) / pesoTotal)
         : arred(ind.reduce((s, c) => s + c.pct_final, 0) / ind.length);
       return {
-        meta_diaria: arred(safeDiv(tReu, duTotal)),
+        meta_diaria: ceilSafeDiv(tReu, duTotal),
         validadas: tVal,
         validadas_hoje: tValHoje,
         pct_final: pctFinalMedio,
