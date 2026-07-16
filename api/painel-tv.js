@@ -48,6 +48,10 @@ const EXCLUIR_SDR_METAS = new Set(["leticia"]); // compara pelo primeiro nome no
 // Top3, e tabela de metas. Diferente da EXCLUIR_SDR_METAS acima, que só tira
 // da tabela específica mas mantém a pessoa nos totais.
 const EXCLUIR_SNIPER_TOTAL = new Set(["priscila"]);
+// Pessoas que saíram da empresa — somem do Top3/ranking (reconhecimento), mas
+// as reuniões/vendas que já fizeram esse mês continuam contando nos totais
+// do squad normalmente. Compara pelo nome completo normalizado.
+const EXCLUIR_RANKING = new Set(["leticia santos"]);
 
 // ── HELPERS ──────────────────────────────────────────────────
 function norm(s) {
@@ -667,6 +671,7 @@ export default async function handler(req, res) {
     for (const nome of ["Sniper", "Elite", "Olympus"]) {
       squadsOut[nome].sdrs.forEach(s => {
         if (s.meta_reuniao <= 0) return;
+        if (EXCLUIR_RANKING.has(norm(s.nome))) return; // conta no total do squad, mas some do ranking
         const hojeReu = s.validadas_hoje || 0;
         todosSdrs.push({
           nome: s.nome, lider: s.lider, pct: s.pct_final,
